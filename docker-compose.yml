@@ -1,0 +1,11 @@
+services:
+  milcom:
+    build: .
+    container_name: milcom-dashboard
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    environment:
+      - PI_IP=100.72.153.111
+      - AUTH_USER=admin
+      - AUTH_PASS=milcom2026

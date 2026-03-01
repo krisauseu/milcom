@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MILCOM – Military Aircraft Monitor</title>
+  <meta name="description" content="Real-time military aircraft tracking dashboard with HUD-style tactical display." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Inline extras -->
+  <style>
+    /* Antenna pulsing marker */
+    .antenna-marker {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #39ff14 30%, transparent 70%);
+      box-shadow: 0 0 10px #39ff14, 0 0 30px #39ff1466;
+      animation: antennaPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes antennaPulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+        box-shadow: 0 0 10px #39ff14, 0 0 30px #39ff1466;
+      }
+
+      50% {
+        transform: scale(1.6);
+        opacity: .5;
+        box-shadow: 0 0 20px #39ff14, 0 0 50px #39ff1466;
+      }
+    }
+
+    .antenna-ring {
+      position: absolute;
+      inset: -8px;
+      border: 1px solid #39ff1444;
+      border-radius: 50%;
+      animation: ringExpand 3s ease-out infinite;
+    }
+
+    @keyframes ringExpand {
+      0% {
+        transform: scale(.5);
+        opacity: .8;
+      }
+
+      100% {
+        transform: scale(3);
+        opacity: 0;
+      }
+    }
+
+    /* TYPE column styling */
+    .type-cell {
+      color: #6ffc4f;
+      font-size: 10px;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .type-cell.tanker {
+      color: #ffab00;
+    }
+
+    .type-cell.awacs {
+      color: #40c4ff;
+    }
+
+    .type-cell.isr {
+      color: #e040fb;
+    }
+
+    .type-cell.fighter {
+      color: #ff5252;
+    }
+
+    .type-cell.bomber {
+      color: #ff5252;
+    }
+
+    .type-cell.transport {
+      color: #69f0ae;
+    }
+
+    .type-cell.special {
+      color: #ffd740;
+    }
+
+    /* New-contact flash row */
+    .new-contact td {
+      animation: newFlash 1.5s ease-out;
+    }
+
+    @keyframes newFlash {
+      0% {
+        background: #39ff1422;
+      }
+
+      100% {
+        background: transparent;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ═══════════════════════ HEADER ══════════════════════════════════════════ -->
+  <header>
+    <h1><span class="icon">⬡</span>MILCOM TACTICAL DISPLAY</h1>
+    <div class="status-bar">
+      <span><span class="conn-dot" id="connDot"></span><span class="label">LINK</span> <span class="value"
+          id="linkStatus">STANDBY</span></span>
+      <span><span class="label">SRC</span> <span class="value" id="srcTotal">—</span></span>
+      <span><span class="label">MIL</span> <span class="value" id="milCount">—</span></span>
+      <span><span class="label">UTC</span> <span class="value" id="utcClock">--:--:--</span></span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════ DASHBOARD ═══════════════════════════════════════ -->
+  <div class="dashboard">
+
+    <!-- ── TABLE PANEL ──────────────────────────────────────────────────────── -->
+    <div class="panel table-panel">
+      <div class="panel-header">
+        <span>▸ CONTACT LIST</span>
+        <span class="badge" id="contactBadge">0</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>CALLSIGN</th>
+              <th>TYPE</th>
+              <th>HEX</th>
+              <th>ALT (ft)</th>
+              <th>SPD (kts)</th>
+              <th>V/R (ft/m)</th>
+              <th>SQUAWK</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr>
+              <td colspan="7" class="no-data">AWAITING DATA FEED …</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── MAP PANEL ────────────────────────────────────────────────────────── -->
+    <div class="panel map-panel">
+      <div class="panel-header">
+        <span>▸ TACTICAL MAP</span>
+        <span class="badge" id="mapBadge">0</span>
+      </div>
+      <div id="map"></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════ SCRIPT ══════════════════════════════════════════ -->
+  <script>
+    (() => {
+      "use strict";
+
+      /* ══════════════════════════════════════════════════════════════════════════
+         SONAR PING – Web Audio API
+         ══════════════════════════════════════════════════════════════════════════ */
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      let audioCtx = null;
+
+      function playSonarPing() {
+        // Lazy-init audio context (needs user gesture on some browsers,
+        // but auto-refresh calls work after first interaction)
+        if (!audioCtx) {
+          try { audioCtx = new AudioCtx(); } catch { return; }
+        }
+        const now = audioCtx.currentTime;
+
+        // Oscillator: 1200 Hz sine, quick decay
+        const osc = audioCtx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+
+        // Gain envelope
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+
+      /* ══════════════════════════════════════════════════════════════════════════
+         MAP SETUP
+         ══════════════════════════════════════════════════════════════════════════ */
+      const map = L.map("map", {
+        center: [50.35, 6.85],
+        zoom: 8,
+        zoomControl: true,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(map);
+
+      const markerLayer = L.layerGroup().addTo(map);
+      const trailLayer = L.layerGroup().addTo(map);   // polyline trails
+      let receiverMarker = null;
+
+      /* ── History trail storage: hex → [[lat,lon], …] (max 15) ─────────────── */
+      const trailHistory = {};
+      const MAX_TRAIL = 15;
+
+      /* ── Aircraft SVG icon factory ──────────────────────────────────────────── */
+      function planeIcon(heading, isEmergency) {
+        const color = isEmergency ? "#ff1744" : "#39ff14";
+        const rotation = heading || 0;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22"
+      style="transform:rotate(${rotation}deg);filter:drop-shadow(0 0 4px ${color})">
+      <path d="M12 2 L14 9 L21 12 L14 15 L12 22 L10 15 L3 12 L10 9 Z"
+            fill="${color}" stroke="#000" stroke-width=".5"/>
+    </svg>`;
+        return L.divIcon({ html: svg, iconSize: [22, 22], iconAnchor: [11, 11], className: "" });
+      }
+
+      /* ── DOM refs ───────────────────────────────────────────────────────────── */
+      const $body = document.getElementById("tableBody");
+      const $badge = document.getElementById("contactBadge");
+      const $mapBadge = document.getElementById("mapBadge");
+      const $srcTotal = document.getElementById("srcTotal");
+      const $milCount = document.getElementById("milCount");
+      const $clock = document.getElementById("utcClock");
+      const $connDot = document.getElementById("connDot");
+      const $linkStat = document.getElementById("linkStatus");
+
+      /* ── UTC clock ──────────────────────────────────────────────────────────── */
+      function tickClock() {
+        const d = new Date();
+        $clock.textContent =
+          String(d.getUTCHours()).padStart(2, "0") + ":" +
+          String(d.getUTCMinutes()).padStart(2, "0") + ":" +
+          String(d.getUTCSeconds()).padStart(2, "0") + "Z";
+      }
+      setInterval(tickClock, 1000);
+      tickClock();
+
+      /* ── Helpers ────────────────────────────────────────────────────────────── */
+      function fmt(v, unit) {
+        if (v == null || v === "") return "—";
+        return Number(v).toLocaleString("en-US") + (unit ? " " + unit : "");
+      }
+
+      function squawkClass(sq) {
+        if (sq === "7700" || sq === "7600" || sq === "7500") return "squawk-emer";
+        return "";
+      }
+
+      function vrClass(vr) {
+        if (vr > 0) return "vr-climb";
+        if (vr < 0) return "vr-desc";
+        return "";
+      }
+
+      /** Classify type string into a CSS class for coloring */
+      function typeColorClass(t) {
+        if (!t) return "";
+        const u = t.toUpperCase();
+        if (u.includes("TANKER") || u.includes("KC-")) return "tanker";
+        if (u.includes("AWACS") || u.includes("E-3")) return "awacs";
+        if (u.includes("ISR") || u.includes("RIVET") || u.includes("RECON") || u.includes("RQ-") || u.includes("GLOBAL HAWK") || u.includes("POSEIDON")) return "isr";
+        if (u.includes("FIGHTER") || u.includes("EUROFIGHTER") || u.includes("STRIKE") || u.includes("BOMBER")) return "fighter";
+        if (u.includes("TRANSPORT") || u.includes("C-17") || u.includes("C-5") || u.includes("C-130") || u.includes("A400M") || u.includes("HERCULES") || u.includes("ATLAS") || u.includes("GALAXY")) return "transport";
+        if (u.includes("SPECIAL") || u.includes("VIP") || u.includes("COMMAND") || u.includes("MEDEVAC") || u.includes("MERCURY")) return "special";
+        return "";
+      }
+
+      /* ══════════════════════════════════════════════════════════════════════════
+         NEW-CONTACT DETECTION
+         ══════════════════════════════════════════════════════════════════════════ */
+      let knownHexes = new Set();
+      let firstLoad = true;
+
+      function detectNewContacts(list) {
+        const currentHexes = new Set(list.map(a => a.hex));
+        const newOnes = [];
+
+        if (!firstLoad) {
+          for (const hex of currentHexes) {
+            if (!knownHexes.has(hex)) {
+              newOnes.push(hex);
+            }
+          }
+          if (newOnes.length > 0) {
+            playSonarPing();
+          }
+        }
+        firstLoad = false;
+        knownHexes = currentHexes;
+        return new Set(newOnes);
+      }
+
+      /* ══════════════════════════════════════════════════════════════════════════
+         MAIN FETCH LOOP
+         ══════════════════════════════════════════════════════════════════════════ */
+      async function refresh() {
+        try {
+          const res = await fetch("/fetch");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          if (data.error) { setOffline(data.error); return; }
+
+          setOnline();
+          const list = data.aircraft || [];
+          $srcTotal.textContent = data.total ?? "—";
+          $milCount.textContent = data.military_count ?? "—";
+          $badge.textContent = list.length;
+          $mapBadge.textContent = list.filter(a => a.lat != null).length;
+
+          const newHexes = detectNewContacts(list);
+          renderTable(list, newHexes);
+          renderMap(list, data.receiver);
+        } catch (err) {
+          setOffline(err.message);
+        }
+      }
+
+      function setOnline() {
+        $connDot.classList.remove("offline");
+        $linkStat.textContent = "ACTIVE";
+      }
+
+      function setOffline(msg) {
+        $connDot.classList.add("offline");
+        $linkStat.textContent = "OFFLINE";
+        $body.innerHTML = `<tr><td colspan="7" class="error-msg">⚠ ${msg}</td></tr>`;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════════════
+         TABLE RENDERING (with TYPE column)
+         ══════════════════════════════════════════════════════════════════════════ */
+      function renderTable(list, newHexes) {
+        if (list.length === 0) {
+          $body.innerHTML = '<tr><td colspan="7" class="no-data">NO MILITARY CONTACTS DETECTED</td></tr>';
+          return;
+        }
+
+        // Sort: emergencies first, then by altitude descending
+        list.sort((a, b) => {
+          const aE = a.squawk === "7700" ? 0 : 1;
+          const bE = b.squawk === "7700" ? 0 : 1;
+          if (aE !== bE) return aE - bE;
+          return (b.alt_baro || 0) - (a.alt_baro || 0);
+        });
+
+        let html = "";
+        for (const ac of list) {
+          const isEmer = ac.squawk === "7700";
+          const isNew = newHexes.has(ac.hex);
+          let cls = "";
+          if (isEmer) cls = "emergency";
+          else if (isNew) cls = "new-contact";
+
+          const call = (ac.flight || "").trim() || ac.hex?.toUpperCase() || "—";
+          const emerLabel = isEmer ? '<span class="emergency-label">EMERGENCY</span>' : "";
+          const sq = ac.squawk || "—";
+          const type = ac._type || "";
+          const typeCls = typeColorClass(type);
+
+          html += `<tr${cls ? ` class="${cls}"` : ""}>
+        <td>${call}${emerLabel}</td>
+        <td class="type-cell ${typeCls}">${type || "—"}</td>
+        <td>${(ac.hex || "—").toUpperCase()}</td>
+        <td>${ac.alt_baro != null ? fmt(ac.alt_baro) : "—"}</td>
+        <td>${ac.gs != null ? fmt(Math.round(ac.gs)) : "—"}</td>
+        <td class="${vrClass(ac.baro_rate)}">${ac.baro_rate != null ? fmt(ac.baro_rate) : "—"}</td>
+        <td class="${squawkClass(sq)}">${sq}</td>
+      </tr>`;
+        }
+        $body.innerHTML = html;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════════════
+         MAP RENDERING (with history trails)
+         ══════════════════════════════════════════════════════════════════════════ */
+      function renderMap(list, receiver) {
+        markerLayer.clearLayers();
+        trailLayer.clearLayers();
+
+        // Antenna marker (once)
+        if (receiver && receiver.lat != null && receiver.lon != null) {
+          if (!receiverMarker) {
+            const antennaIcon = L.divIcon({
+              html: '<div class="antenna-marker"><div class="antenna-ring"></div></div>',
+              iconSize: [18, 18], iconAnchor: [9, 9], className: "",
+            });
+            receiverMarker = L.marker([receiver.lat, receiver.lon], { icon: antennaIcon, zIndexOffset: 1000 })
+              .bindPopup(
+                '<b>📡 RECEIVER</b><br>' +
+                `LAT: ${receiver.lat.toFixed(6)}<br>` +
+                `LON: ${receiver.lon.toFixed(6)}`,
+                { closeButton: false }
+              );
+            receiverMarker.addTo(map);
+            map.setView([receiver.lat, receiver.lon], 8);
+          }
+        }
+
+        const withPos = list.filter(a => a.lat != null && a.lon != null);
+
+        for (const ac of withPos) {
+          const hex = ac.hex;
+          const isEmer = ac.squawk === "7700";
+          const call = (ac.flight || "").trim() || hex?.toUpperCase() || "UNKN";
+          const type = ac._type || "";
+
+          // ── Update trail history ─────────────────────────────────
+          if (!trailHistory[hex]) trailHistory[hex] = [];
+          const trail = trailHistory[hex];
+          const lastPos = trail[trail.length - 1];
+          // Only add if position actually changed
+          if (!lastPos || lastPos[0] !== ac.lat || lastPos[1] !== ac.lon) {
+            trail.push([ac.lat, ac.lon]);
+            if (trail.length > MAX_TRAIL) trail.shift();
+          }
+
+          // ── Draw trail polyline ──────────────────────────────────
+          if (trail.length > 1) {
+            const trailColor = isEmer ? "#ff174466" : "#39ff1444";
+            L.polyline(trail, {
+              color: trailColor,
+              weight: 1.5,
+              dashArray: "4 4",
+              interactive: false,
+            }).addTo(trailLayer);
+          }
+
+          // ── Aircraft marker ──────────────────────────────────────
+          const marker = L.marker([ac.lat, ac.lon], {
+            icon: planeIcon(ac.track, isEmer),
+          });
+
+          marker.bindPopup(
+            `<b>${call}</b>` + (type ? `<br><span style="color:#6ffc4f;font-size:10px">${type}</span>` : "") + `<br>` +
+            `HEX: ${(hex || "—").toUpperCase()}<br>` +
+            `ALT: ${ac.alt_baro != null ? fmt(ac.alt_baro, "ft") : "—"}<br>` +
+            `SPD: ${ac.gs != null ? fmt(Math.round(ac.gs), "kts") : "—"}<br>` +
+            `SQK: ${ac.squawk || "—"}` +
+            (isEmer ? '<br><span style="color:#ff1744;font-weight:700">⚠ EMERGENCY</span>' : ""),
+            { closeButton: false, className: "" }
+          );
+
+          marker.addTo(markerLayer);
+        }
+
+        // Clean up trails for aircraft no longer visible
+        const activeHexes = new Set(withPos.map(a => a.hex));
+        for (const hex of Object.keys(trailHistory)) {
+          if (!activeHexes.has(hex)) delete trailHistory[hex];
+        }
+      }
+
+      /* ── Start ──────────────────────────────────────────────────────────────── */
+      refresh();
+      setInterval(refresh, 2000);
+    })();
+  </script>
+
+</body>
+
+</html>

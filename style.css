@@ -1,0 +1,341 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MILITARY AIRCRAFT MONITOR – HUD / COCKPIT STYLE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
+:root {
+  --bg: #050505;
+  --panel-bg: #0a0a0aee;
+  --border: #39ff1444;
+  --border-hi: #39ff1488;
+  --green: #39ff14;
+  --green-dim: #39ff1466;
+  --green-glow: 0 0 6px #39ff1488, 0 0 20px #39ff1422;
+  --red: #ff1744;
+  --amber: #ffab00;
+  --font: "Share Tech Mono", "Fira Mono", "Courier New", monospace;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--green);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* ── Scanline overlay ───────────────────────────────────────────────────── */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, .12) 2px,
+      rgba(0, 0, 0, .12) 4px);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-hi);
+  background: linear-gradient(180deg, #0f0f0f, var(--bg));
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+header h1 {
+  font-size: 16px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  text-shadow: var(--green-glow);
+}
+
+header h1 .icon {
+  margin-right: 8px;
+}
+
+.status-bar {
+  display: flex;
+  gap: 18px;
+  font-size: 11px;
+  color: var(--green-dim);
+}
+
+.status-bar span {
+  white-space: nowrap;
+}
+
+.status-bar .label {
+  color: var(--green);
+  opacity: .5;
+  margin-right: 4px;
+}
+
+.status-bar .value {
+  color: var(--green);
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.dashboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  height: calc(100vh - 52px);
+}
+
+.panel {
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-header {
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--green-dim);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header .badge {
+  background: var(--green);
+  color: var(--bg);
+  padding: 1px 8px;
+  border-radius: 2px;
+  font-weight: 700;
+  font-size: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ── Table panel (left) ─────────────────────────────────────────────────── */
+.table-panel {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-wrap {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--green-dim) var(--bg);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #0a0a0a;
+}
+
+th {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-hi);
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--green-dim);
+  white-space: nowrap;
+}
+
+td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tr:hover td {
+  background: #39ff1409;
+}
+
+/* ── Squawk 7700 emergency row ──────────────────────────────────────────── */
+.emergency td {
+  color: var(--red) !important;
+  animation: emergencyBlink 0.8s ease-in-out infinite;
+}
+
+.emergency-label {
+  display: inline-block;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 2px;
+  letter-spacing: 1px;
+  margin-left: 6px;
+  animation: emergencyBlink 0.8s ease-in-out infinite;
+}
+
+@keyframes emergencyBlink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .25;
+  }
+}
+
+/* squawk coloring */
+.squawk-emer {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.squawk-other {
+  color: var(--amber);
+}
+
+/* vertical rate coloring */
+.vr-climb {
+  color: #00e676;
+}
+
+.vr-desc {
+  color: #ff5252;
+}
+
+/* ── Map panel (right-top) ──────────────────────────────────────────────── */
+.map-panel {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  background: #000 !important;
+}
+
+/* Invert ONLY the tile layer — markers, trails, antenna stay untouched */
+.leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(90deg) brightness(0.4) contrast(1.2);
+}
+
+.leaflet-container {
+  background: #000 !important;
+}
+
+/* Force Leaflet controls green */
+.leaflet-control-zoom a {
+  background: var(--bg) !important;
+  color: var(--green) !important;
+  border-color: var(--border-hi) !important;
+}
+
+/* ── Popup ──────────────────────────────────────────────────────────────── */
+.leaflet-popup-content-wrapper {
+  background: #0c0c0cee !important;
+  color: var(--green) !important;
+  border: 1px solid var(--border-hi) !important;
+  border-radius: 2px !important;
+  font-family: var(--font) !important;
+  font-size: 11px !important;
+  box-shadow: 0 0 12px #39ff1433 !important;
+}
+
+.leaflet-popup-tip {
+  background: #0c0c0cee !important;
+}
+
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+}
+
+.leaflet-popup-content b {
+  color: #6ffc4f;
+}
+
+/* ── Footer / no-data placeholder  ──────────────────────────────────────── */
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: var(--green-dim);
+  font-size: 14px;
+  letter-spacing: 4px;
+}
+
+.error-msg {
+  text-align: center;
+  padding: 20px;
+  color: var(--red);
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+
+/* ── Utility ────────────────────────────────────────────────────────────── */
+.mono {
+  font-family: var(--font);
+}
+
+/* ── "Connection" indicator ─────────────────────────────────────────────── */
+.conn-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  transition: background .3s, box-shadow .3s;
+}
+
+.conn-dot.offline {
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red);
+}
+
+/* ── Responsive (small screens stack vertically) ────────────────────────── */
+@media (max-width: 960px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+    grid-template-rows: 50vh 50vh;
+  }
+
+  .table-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .map-panel {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
