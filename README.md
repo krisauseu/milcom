@@ -4,13 +4,25 @@ MilCom is a lightweight, web-based dashboard designed to monitor military aircra
 
 ![MilCom Dashboard](milcom.png)
 
-## How It Works
+## Filtering & Identification
 
-The application acts as a middleman between your ADS-B receiver and a web interface. It continuously polls the JSON data provided by **SkyAware/Piaware** and filters for specific aircraft based on:
+MilCom uses a strict, multi-layered filtering system to ensure a pure military tactical display:
 
-*   **ICAO Hex Ranges**: Targets known military blocks globally (US DoD, UK MoD, Luftwaffe, NATO, etc.).
-*   **Callsign Patterns**: Monitors for tactical callsigns like `FORTE` (Global Hawk), `LAGR` (Tankers), `NATO` (AWACS), and many more.
-*   **Role Identification**: Automatically categorizes aircraft into roles such as *Tanker*, *ISR*, *Transport*, *Fighter*, or *Special Ops*.
+### 1. Strict Callsign Filter
+Only aircraft with specific military callsign prefixes are allowed through. This includes:
+*   **US/NATO Transport & AWACS**: `RCH`, `C5`, `C17`, `C130`, `CNV`, `NATO`, `MAGIC`
+*   **European Air Forces**: `GAF`, `GNY` (Germany), `RRR`, `ASCOT` (UK), `BAF` (Belgium), `NAF` (Netherlands), `FAF`, `AME` (France), `POL` (Poland), etc.
+*   **Special Ops & ISR**: `DUKE`, `VADER`, `JAKE`, `FORTE`
+*   **Tankers**: `LAGR`, `NCHO`, `QID`, `GOLD`, `TEX`, `TARTN`
+
+### 2. Precise HEX Ranges
+Beyond callsigns, MilCom tracks thousands of specific ICAO hex addresses belonging to military airframes. National blocks are narrowed down to military-only sub-ranges (e.g., US Military `AE0000-AFFFFF`) to exclude civilian aircraft from the same country.
+
+### 3. Emergency Exceptions
+Any aircraft broadcasting an **Emergency Squawk** (`7700` General Emergency, `7600` Radio Failure, `7500` Hijack) is **ALWAYS** displayed, regardless of its origin or type.
+
+### 4. Country Fallback Identification
+If a specific aircraft type is not in our database, MilCom uses its HEX range to identify the country of origin. Instead of a blank entry, you will see labels like `TUR Military`, `GRC Military`, or `DEU Military`.
 
 ## Hardware Requirements
 
