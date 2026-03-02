@@ -22,7 +22,7 @@ Beyond callsigns, MilCom tracks thousands of specific ICAO hex addresses belongi
 Any aircraft broadcasting an **Emergency Squawk** (`7700` General Emergency, `7600` Radio Failure, `7500` Hijack) is **ALWAYS** displayed, regardless of its origin or type.
 
 ### 4. Country Fallback Identification
-If a specific aircraft type is not in our database, MilCom uses its HEX range to identify the country of origin. Instead of a blank entry, you will see labels like `TUR Military`, `GRC Military`, or `DEU Military`.
+If a specific aircraft type is not in our database, MilCom uses its HEX range to identify the country of origin. Instead of a blank entry, you will see labels like `TUR`, `GRC`, or `DEU`.
 
 ## Hardware Requirements
 
