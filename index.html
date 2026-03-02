@@ -447,11 +447,11 @@
 
           // ── Draw trail polyline ──────────────────────────────────
           if (trail.length > 1) {
-            const trailColor = isEmer ? "#ff174466" : "#39ff1444";
+            const trailColor = isEmer ? "#ff1744aa" : "#39ff1488"; // Increased opacity (aa for emergency, 88 for normal)
             L.polyline(trail, {
               color: trailColor,
-              weight: 1.5,
-              dashArray: "4 4",
+              weight: 2, // Slightly increased from 1.5
+              dashArray: "5 5", // Adjusted for better visual spacing
               interactive: false,
             }).addTo(trailLayer);
           }

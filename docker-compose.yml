@@ -6,6 +6,6 @@ services:
     ports:
       - "5050:5050"
     environment:
-      - PI_IP=100.72.153.111
+      - PI_IP=172.16.16.35
       - AUTH_USER=admin
       - AUTH_PASS=milcom2026

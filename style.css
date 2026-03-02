@@ -9,7 +9,8 @@
   --border: #39ff1444;
   --border-hi: #39ff1488;
   --green: #39ff14;
-  --green-dim: #39ff1466;
+  --green-dim: #39ff14aa;
+  /* Increased from 66 to aa for better visibility */
   --green-glow: 0 0 6px #39ff1488, 0 0 20px #39ff1422;
   --red: #ff1744;
   --amber: #ffab00;
@@ -115,7 +116,10 @@ header h1 .icon {
   text-transform: uppercase;
   padding: 8px 14px;
   border-bottom: 1px solid var(--border);
-  color: var(--green-dim);
+  color: var(--green);
+  /* Changed from green-dim to green */
+  opacity: 0.8;
+  /* Added slight opacity for hierarchy but kept it bright */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -167,7 +171,9 @@ th {
   font-size: 10px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--green-dim);
+  color: var(--green);
+  /* Changed from green-dim to green for better visibility */
+  opacity: 0.9;
   white-space: nowrap;
 }
 
