@@ -161,91 +161,70 @@ HEX_AIRCRAFT_DB = {
     "340202": "A400M Atlas (SAF)",
 }
 
-# ── HEX prefix → type guessing (broader ranges) ────────────────────────────
 HEX_PREFIX_TYPES = [
+    ("ae",   "USAF"),
+    ("af",   "USAF"),
+    ("adf",  "USAF UAV"),
     ("3e8",  "A400M (GAF)"),
     ("3fc8", "Bundeswehr"),
     ("3fc9", "Bundeswehr"),
     ("3e23", "Helikopter (GAF)"),
-    ("43c2", "AWACS/ISR (RAF)"),
-    ("43c0", "Transport (RAF)"),
-    ("43c6", "Tanker/ISR (RAF)"),
-    ("4781", "E-3A AWACS (NATO)"),
-    ("ae",   "USAF"),
-    ("af",   "USAF"),
-    ("adf",  "USAF UAV"),
     ("3a0",  "French AF"),
     ("33ff", "Italian AF"),
     ("4485", "Belgian AF"),
     ("3402", "Spanish AF"),
+    ("4b",   "TUR Military"),
+    ("4a",   "GRC Military"),
 ]
 
 # ── Military ICAO hex ranges ───────────────────────────────────────────────
 MILITARY_HEX_RANGES = [
-    # US DoD
-    (0xAE0000, 0xAFFFFF),
-    # UK MoD
-    (0x43C000, 0x43CFFF),
-    # Germany (Specific Military Blocks)
-    (0x3E8000, 0x3E8FFF),
-    (0x3FC800, 0x3FCFFF),
-    # France
-    (0x3A0000, 0x3A0FFF),
-    # Italy (Specific Mil)
-    (0x33FF00, 0x33FFFF),
-    # NATO (AWACS mostly)
-    (0x478100, 0x4781FF),
-    # Australia
-    (0x7CF800, 0x7CFFFF),
-    # Canada
-    (0xC0CDF9, 0xC0FFFF),
-    # Netherlands (Specific Mil)
-    (0x480C00, 0x480CFF),
-    # Belgium
-    (0x448000, 0x448FFF),
-    # Spain
-    (0x340000, 0x340FFF),
-    # Turkey
-    (0x4B8000, 0x4BFFFF),
-    # Japan
-    (0x840000, 0x87FFFF),
-    # South Korea
-    (0x710000, 0x71FFFF),
-    # Israel
-    (0x738000, 0x73FFFF),
-    # India
-    (0x800000, 0x83FFFF),
-    # China
-    (0x780000, 0x7BFFFF),
-    # Russia
-    (0x150000, 0x15FFFF),
-    # Brazil
-    (0xE40000, 0xE4FFFF),
-    # Sweden
-    (0x4A0000, 0x4AFFFF),
-    # Poland (Specific Mil)
-    (0x484000, 0x4840FF),
-    # UAE
-    (0x896000, 0x896FFF),
-    # Egypt
-    (0x090000, 0x09FFFF),
-    # Pakistan
-    (0xA00000, 0xA0FFFF),
+    # lo, hi, label
+    (0xAE0000, 0xAFFFFF, "USA Military"),
+    (0x43C000, 0x43CFFF, "GBR Military"),
+    (0x3E8000, 0x3E8FFF, "DEU Military"),
+    (0x3FC800, 0x3FCFFF, "DEU Military"),
+    (0x3A0000, 0x3A0FFF, "FRA Military"),
+    (0x33FF00, 0x33FFFF, "ITA Military"),
+    (0x478100, 0x4781FF, "NATO Military"),
+    (0x7CF800, 0x7CFFFF, "AUS Military"),
+    (0xC0CDF9, 0xC0FFFF, "CAN Military"),
+    (0x480C00, 0x480CFF, "NLD Military"),
+    (0x448000, 0x448FFF, "BEL Military"),
+    (0x340000, 0x340FFF, "ESP Military"),
+    (0x4B8000, 0x4BFFFF, "TUR Military"),
+    (0x840000, 0x87FFFF, "JPN Military"),
+    (0x710000, 0x71FFFF, "KOR Military"),
+    (0x738000, 0x73FFFF, "ISR Military"),
+    (0x800000, 0x83FFFF, "IND Military"),
+    (0x780000, 0x7BFFFF, "CHN Military"),
+    (0x150000, 0x15FFFF, "RUS Military"),
+    (0xE40000, 0xE4FFFF, "BRA Military"),
+    (0x4A0000, 0x4AFFFF, "GRC Military"),
+    (0x484000, 0x4840FF, "POL Military"),
+    (0x896000, 0x896FFF, "UAE Military"),
+    (0x090000, 0x09FFFF, "EGY Military"),
+    (0xA00000, 0xA0FFFF, "PAK Military"),
 ]
+
+
+def _get_military_label(hex_code: str) -> str:
+    """Return the military label if the hex is in range, else empty string."""
+    if not hex_code:
+        return ""
+    try:
+        value = int(hex_code, 16)
+    except ValueError:
+        return ""
+    for (lo, hi, label) in MILITARY_HEX_RANGES:
+        if lo <= value <= hi:
+            return label
+    return ""
 
 
 def _is_military_hex(hex_code: str) -> bool:
     """Check whether an ICAO hex address falls inside a known military block."""
-    if not hex_code:
-        return False
-    try:
-        value = int(hex_code, 16)
-    except ValueError:
-        return False
-    for (lo, hi) in MILITARY_HEX_RANGES:
-        if lo <= value <= hi:
-            return True
-    return False
+    return bool(_get_military_label(hex_code))
 
 
 def _identify_type(ac: dict) -> str:
@@ -266,6 +245,11 @@ def _identify_type(ac: dict) -> str:
     for prefix, role in CALLSIGN_ROLES.items():
         if flight.startswith(prefix):
             return role
+
+    # 4) Fallback to Country Label
+    country_label = _get_military_label(hex_code)
+    if country_label:
+        return country_label
 
     return ""
 
