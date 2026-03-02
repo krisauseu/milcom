@@ -34,90 +34,50 @@ PI_IP        = os.environ.get("PI_IP", "172.16.16.35")
 DATA_URL     = f"http://{PI_IP}/skyaware/data/aircraft.json"
 RECEIVER_URL = f"http://{PI_IP}/skyaware/data/receiver.json"
 
-# ── Military callsign prefixes → role mapping ───────────────────────────────
-# Each prefix maps to (role_label, description)
+# ── Stricter Military Filter (Callsign Prefixes) ─────────────────────────────
+# Updated list based on user request for "pure MilCom display"
 CALLSIGN_ROLES = {
-    # NATO / US Transport
-    "RCH":   "Transport",
-    "REACH": "Transport",
-    "ASCOT": "Transport",
-    "EVAC":  "MedEvac",
-    "SPAR":  "VIP Transport",
-    "TOPCT": "Transport",
-    "BISON": "Transport",
-    "ORDER": "Transport",
-    "ROMA":  "Transport",
-    # Tankers
-    "LAGR":  "Tanker",
-    "LAGER": "Tanker",
-    "NCHO":  "Tanker",
-    "NACHO": "Tanker",
-    "QID":   "Tanker",
-    "ARROW": "Tanker",
-    "TEX":   "Tanker",
-    "GOLD":  "Tanker",
-    "TARTN": "Tanker",
-    "ETHYL": "Tanker",
-    "SHELL": "Tanker",
-    # ISR / Recon
-    "FORTE": "ISR / RQ-4",
-    "JAKE":  "ISR",
-    "HOMER": "ISR",
-    # Fighters / Strike
-    "DUKE":  "Fighter",
-    "VADER": "Fighter",
-    "LION":  "Fighter",
-    "HAVOC": "Fighter",
-    "GHOST": "Fighter",
-    "VIPER": "Fighter",
-    "TREND": "Fighter",
-    "GOTHAM":"Fighter",
-    "KNIFE": "Strike",
-    "DOOM":  "Strike",
-    "IRON":  "Strike",
-    # Bombers
-    "ATLAS": "Bomber",
-    "EPIC":  "Bomber",
-    # Special / Airlift
-    "PLUTO": "Special Ops",
-    # AWACS / C2
-    "NATO":  "AWACS / C2",
+    # US Air Force / Navy / NATO
+    "RCH":   "USAF Reach",
+    "C5":    "USAF C-5",
+    "C17":   "USAF C-17",
+    "C130":  "USAF C-130",
+    "CNV":   "US Navy",
+    "NATO":  "NATO AWACS",
     "MAGIC": "AWACS",
-    "BAKE":  "AWACS",
-    "ABLE":  "Command",
-    # National air force ICAO codes
-    "RRR":   "RAF",
-    "BAF":   "Belgian AF",
+    
+    # German Air Force / Navy
     "GAF":   "German AF",
+    "GNY":   "German Navy",
+    
+    # UK RAF
+    "RRR":   "RAF (Ascot)",
+    "ASCOT": "RAF (Ascot)",
+    
+    # Other NATO Partners
+    "BAF":   "Belgian AF",
+    "NAF":   "Netherlands AF",
     "IAM":   "Italian AF",
     "AME":   "French AF",
-    "GAMBI": "French Logistics",
     "FAF":   "French AF",
+    "HUAF":  "Hungarian AF",
+    "CZE":   "Czech AF",
+    "POL":   "Polish AF",
     "HAF":   "Hellenic AF",
-    "PAF":   "Polish AF",
-    "TAF":   "Turkish AF",
-    "SAF":   "Spanish AF",
-    "SUI":   "Swiss AF",
-    "HVK":   "Dutch AF",
-    "SVF":   "Swedish AF",
-    "NAF":   "Norwegian AF",
-    "DAF":   "Danish AF",
-    "FAP":   "Portuguese AF",
-    "CFC":   "Canadian Forces",
-    "CNV":   "US Navy",
-    "AIO":   "Italian Army",
-    "MMF":   "Italian Navy",
-    "UAE":   "UAE AF",
-    "RSF":   "Saudi AF",
-    "IAF":   "Israeli AF",
-    "JAF":   "JASDF",
-    "KAF":   "ROKAF",
-    "INF":   "Indian AF",
-    "CAF":   "Chinese AF",
-    "JASDF": "JASDF",
-    "ROKAF": "ROKAF",
-    "RAAF":  "Australian AF",
-    "RNZAF": "RNZAF",
+    
+    # Tankers
+    "LAGR":  "Tanker",
+    "NCHO":  "Tanker",
+    "QID":   "Tanker",
+    "GOLD":  "Tanker",
+    "TEX":   "Tanker",
+    "TARTN": "Tanker",
+    
+    # Special Ops / ISR
+    "DUKE":  "Special Ops",
+    "VADER": "Special Ops",
+    "JAKE":  "ISR",
+    "FORTE": "ISR / RQ-4",
 }
 
 MILITARY_CALLSIGN_PREFIXES = tuple(CALLSIGN_ROLES.keys())
@@ -226,25 +186,25 @@ MILITARY_HEX_RANGES = [
     (0xAE0000, 0xAFFFFF),
     # UK MoD
     (0x43C000, 0x43CFFF),
-    # Germany (Bundeswehr)
-    (0x3E0000, 0x3EFFFF),
-    (0x3FC000, 0x3FFFFF),
+    # Germany (Specific Military Blocks)
+    (0x3E8000, 0x3E8FFF),
+    (0x3FC800, 0x3FCFFF),
     # France
-    (0x3A0000, 0x3AFFFF),
-    # Italy
-    (0x330000, 0x337FFF),
-    # NATO
-    (0x470000, 0x47FFFF),
+    (0x3A0000, 0x3A0FFF),
+    # Italy (Specific Mil)
+    (0x33FF00, 0x33FFFF),
+    # NATO (AWACS mostly)
+    (0x478100, 0x4781FF),
     # Australia
     (0x7CF800, 0x7CFFFF),
     # Canada
     (0xC0CDF9, 0xC0FFFF),
-    # Netherlands
-    (0x480000, 0x480FFF),
+    # Netherlands (Specific Mil)
+    (0x480C00, 0x480CFF),
     # Belgium
-    (0x448000, 0x44FFFF),
+    (0x448000, 0x448FFF),
     # Spain
-    (0x340000, 0x34FFFF),
+    (0x340000, 0x340FFF),
     # Turkey
     (0x4B8000, 0x4BFFFF),
     # Japan
@@ -263,8 +223,8 @@ MILITARY_HEX_RANGES = [
     (0xE40000, 0xE4FFFF),
     # Sweden
     (0x4A0000, 0x4AFFFF),
-    # Poland
-    (0x484000, 0x487FFF),
+    # Poland (Specific Mil)
+    (0x484000, 0x4840FF),
     # UAE
     (0x896000, 0x896FFF),
     # Egypt
@@ -311,14 +271,26 @@ def _identify_type(ac: dict) -> str:
 
 
 def _is_military(ac: dict) -> bool:
-    """Return True if the aircraft matches any military heuristic."""
+    """
+    Return True if the aircraft matches specific military criteria:
+    - Callsign prefix from STRICT_MILITARY_PREFIXES
+    - HEX code within a known military block
+    - Emergency Squawk (7500, 7600, 7700) - NEVER exclude
+    """
     flight = (ac.get("flight") or "").strip().upper()
     hex_code = (ac.get("hex") or "").strip().lower()
+    squawk = str(ac.get("squawk") or "").strip()
 
+    # 1) Emergency Exception (ALWAYS show)
+    if squawk in ("7500", "7600", "7700"):
+        return True
+
+    # 2) Strict Callsign Prefix Filter
     for prefix in MILITARY_CALLSIGN_PREFIXES:
         if flight.startswith(prefix):
             return True
 
+    # 3) Military HEX Range Filter
     if _is_military_hex(hex_code):
         return True
 

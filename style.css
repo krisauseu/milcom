@@ -305,6 +305,20 @@ tr:hover td {
   letter-spacing: 2px;
 }
 
+/* ── HEX link (FlightAware) ─────────────────────────────────────────────── */
+.hex-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.hex-link:hover {
+  text-shadow: 0 0 6px var(--green), 0 0 14px var(--green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--green-dim);
+}
+
 /* ── Utility ────────────────────────────────────────────────────────────── */
 .mono {
   font-family: var(--font);

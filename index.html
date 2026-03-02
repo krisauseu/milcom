@@ -382,14 +382,18 @@
           if (isEmer) cls = "emergency";
           else if (isNew) cls = "new-contact";
 
-          const call = (ac.flight || "").trim() || ac.hex?.toUpperCase() || "—";
+          const rawCall = (ac.flight || "").trim();
+          const callLabel = rawCall || ac.hex?.toUpperCase() || "—";
+          const callHtml = rawCall && ac.hex
+            ? `<a href="https://flightaware.com/live/modes/${ac.hex.toLowerCase()}/ident/${rawCall}/redirect" target="_blank" class="hex-link">${callLabel}</a>`
+            : callLabel;
           const emerLabel = isEmer ? '<span class="emergency-label">EMERGENCY</span>' : "";
           const sq = ac.squawk || "—";
           const type = ac._type || "";
           const typeCls = typeColorClass(type);
 
           html += `<tr${cls ? ` class="${cls}"` : ""}>
-        <td>${call}${emerLabel}</td>
+        <td>${callHtml}${emerLabel}</td>
         <td class="type-cell ${typeCls}">${type || "—"}</td>
         <td>${(ac.hex || "—").toUpperCase()}</td>
         <td>${ac.alt_baro != null ? fmt(ac.alt_baro) : "—"}</td>
