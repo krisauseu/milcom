@@ -48,6 +48,7 @@ Aircraft type is resolved in this order:
 *   **REG + TYPE columns** from live data and aircraft DB
 *   **Tactical HUD**: pulsing ⊕ crosshair icon for military contacts, national flag emojis, ▲/▼ altitude trend arrows
 *   **Click-to-pan**: click a row to fly the map to that aircraft and highlight its trail
+*   **Quick Copy**: One-click 📋 button to copy neatly formatted aircraft data to the clipboard
 *   **Sonar ping** audio alert on new contact detection
 *   **Basic Auth** protected access
 

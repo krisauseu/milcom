@@ -166,6 +166,24 @@
 
     /* ── Active trail (clicked aircraft) ─────────────────────────────────── */
     /* applied via JS to the polyline */
+
+    /* ── Copy Button ──────────────────────────────────────────────────────── */
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #39ff1444;
+      color: #39ff14;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 4px;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: #39ff14;
+      color: #000;
+      border-color: #39ff14;
+    }
   </style>
 </head>
 
@@ -205,11 +223,12 @@
               <th>V/R (ft/m)</th>
               <th>DST (nm)</th>
               <th>SQUAWK</th>
+              <th>ACT</th>
             </tr>
           </thead>
           <tbody id="tableBody">
             <tr>
-              <td colspan="9" class="no-data">AWAITING DATA FEED …</td>
+              <td colspan="10" class="no-data">AWAITING DATA FEED …</td>
             </tr>
           </tbody>
         </table>
@@ -436,7 +455,7 @@
       function setOffline(msg) {
         $connDot.classList.add("offline");
         $linkStat.textContent = "OFFLINE";
-        $body.innerHTML = `<tr><td colspan="9" class="error-msg">⚠ ${msg}</td></tr>`;
+        $body.innerHTML = `<tr><td colspan="10" class="error-msg">⚠ ${msg}</td></tr>`;
       }
 
       /* ══════════════════════════════════════════════════════════════════════
@@ -444,7 +463,7 @@
          ══════════════════════════════════════════════════════════════════════ */
       function renderTable(list, newHexes) {
         if (list.length === 0) {
-          $body.innerHTML = '<tr><td colspan="9" class="no-data">NO MILITARY CONTACTS DETECTED</td></tr>';
+          $body.innerHTML = '<tr><td colspan="10" class="no-data">NO MILITARY CONTACTS DETECTED</td></tr>';
           return;
         }
 
@@ -499,6 +518,39 @@
             ? Number(ac.r_dst).toFixed(1)
             : "—";
 
+          let altText = '—';
+          if (ac.alt_baro !== null && ac.alt_baro !== undefined) {
+            if (ac.alt_baro < 0 && ac.gs < 100) {
+              altText = 'GND';
+            } else if (ac.alt_baro < 0) {
+              altText = `(${ac.alt_baro} ft)`;
+            } else {
+              altText = `${ac.alt_baro} ft`;
+            }
+          }
+
+          const spdText = ac.gs != null ? Math.round(ac.gs) + " kts" : "—";
+          const sqText = sq !== "—" ? sq : "—";
+
+          const rawCallOut = callLabel;
+          const regOut = reg !== "—" ? reg : "";
+          const typeOut = type || "";
+          const hexOut = (ac.hex || "").toUpperCase();
+
+          const copyDataArray = [
+            `CALLSIGN: ${rawCallOut || '—'}`,
+            `REG:      ${regOut || '—'}`,
+            `TYPE:     ${typeOut || '—'}`,
+            `HEX:      ${hexOut}`,
+            `ALT:      ${altText}`,
+            `SPD:      ${spdText}`,
+            `SQUAWK:   ${sqText}`,
+            isMil ? 'MILITARY' : ''
+          ];
+          const copyData = copyDataArray.filter(Boolean).join('\n');
+          const copyDataEscaped = copyData.replace(/"/g, '&quot;');
+          const copyBtn = `<button class="copy-btn" title="Copy data to clipboard" data-copy="${copyDataEscaped}">📋</button>`;
+
           html += `<tr${cls ? ` class="${cls}"` : ""} data-hex="${ac.hex || ""}" data-lat="${ac.lat ?? ""}" data-lon="${ac.lon ?? ""}">
           <td>${flag}${crosshair}${callHref}${emerLabel}</td>
           <td class="type-cell">${reg}</td>
@@ -509,6 +561,7 @@
           <td class="${vr > 100 ? "vr-climb" : vr < -100 ? "vr-desc" : ""}">${vr != null ? fmt(vr) : "—"}</td>
           <td>${dstNm}</td>
           <td class="${squawkClass(sq)}">${sq}</td>
+          <td>${copyBtn}</td>
         </tr>`;
         }
         $body.innerHTML = html;
@@ -516,7 +569,17 @@
         // Attach click handlers
         document.querySelectorAll("tr[data-hex]").forEach(row => {
           row.style.cursor = "pointer";
-          row.addEventListener("click", () => {
+          row.addEventListener("click", (e) => {
+            const btn = e.target.closest('.copy-btn');
+            if (btn) {
+              e.stopPropagation(); // prevent map selection
+              navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+                const oldText = btn.innerHTML;
+                btn.innerHTML = '✅';
+                setTimeout(() => btn.innerHTML = oldText, 1000);
+              });
+              return;
+            }
             const hex = row.dataset.hex;
             const lat = row.dataset.lat ? parseFloat(row.dataset.lat) : null;
             const lon = row.dataset.lon ? parseFloat(row.dataset.lon) : null;
