@@ -89,10 +89,11 @@ def load_military_db(download_if_missing: bool = True) -> int:
     tar1090-db CSV format (semicolon-separated, no header):
       col 0: icao hex  (lowercase, 6 chars)
       col 1: registration  (e.g. "31+03")
-      col 2: type code     (e.g. "C17", "EUFI")
-      col 3: flags         (int; bit 0=military, bit 1=interesting, bit 3=LADD)
+      col 2: type code     (generic type code, e.g. "C17")
+      col 3: icao type code(specific model, e.g. "C17")
+      col 4: flags         (int; bit 0=military, bit 1=interesting, bit 3=LADD)
 
-    Some rows may have additional columns – we always use col 3 for flags.
+    We use col 4 for flags as per current tar1090-db format.
     """
     global MILITARY_HEXES, AC_TYPE_MAP
 
@@ -124,18 +125,11 @@ def load_military_db(download_if_missing: bool = True) -> int:
                 if t:
                     new_types[hex_upper] = t
 
-                # Flags (col 3) — primary location in tar1090-db format
+                # Flags stehen in tar1090-db/csv immer in Spalte 4 (row[4])
                 try:
-                    flags = int(row[3])
+                    flags = int(row[4]) if len(row) > 4 else 0
                 except (ValueError, IndexError):
-                    # Some rows may have flags at col 4 (extended format)
-                    if len(row) > 4:
-                        try:
-                            flags = int(row[4])
-                        except (ValueError, IndexError):
-                            continue
-                    else:
-                        continue
+                    continue
 
                 if flags & 1:          # bit 0 = military
                     new_military.add(hex_upper)
@@ -288,7 +282,7 @@ def db_debug():
                 rows.append(row)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
-    return jsonify({"sample_rows": rows, "col_explanation": "0=icao, 1=reg, 2=type, 3=flags"})
+    return jsonify({"sample_rows": rows, "col_explanation": "0=icao, 1=reg, 2=type, 3=icao_type, 4=flags"})
 
 
 @app.route("/db-status")
