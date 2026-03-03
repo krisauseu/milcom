@@ -114,26 +114,30 @@ def load_military_db(download_if_missing: bool = True) -> int:
         with gzip.open(DB_PATH, "rt", encoding="utf-8", errors="replace") as fh:
             reader = csv.reader(fh, delimiter=";")
             for row in reader:
-                if len(row) < 4:
+                if len(row) < 1:
                     continue
                 hex_upper = row[0].strip().upper()
                 if not hex_upper:
                     continue
 
                 # Type code (col 2)
-                t = row[2].strip()
-                if t:
-                    new_types[hex_upper] = t
+                if len(row) > 2:
+                    t = row[2].strip()
+                    if t:
+                        new_types[hex_upper] = t
 
-                # Flags stehen in tar1090-db/csv immer in Spalte 4 (row[4])
-                try:
-                    flags = int(row[4]) if len(row) > 4 else 0
-                except (ValueError, IndexError):
-                    continue
-
-                if flags & 1:          # bit 0 = military
+                # Check via Range
+                if _hex_in_range(hex_upper):
                     new_military.add(hex_upper)
                     count += 1
+                    continue
+                
+                # Check via Type (col 2) for military patterns
+                if len(row) > 2:
+                    ac_type = row[2].strip().upper()
+                    if ac_type in ['C17', 'C130', 'KC135', 'F16', 'A400', 'E3CF', 'EUFI', 'TORN', 'C5', 'B52']:
+                        new_military.add(hex_upper)
+                        count += 1
 
         with _db_lock:
             MILITARY_HEXES = new_military
@@ -162,17 +166,39 @@ def _db_refresh_loop():
 
 # ── ICAO HEX range fallback (used when DB hasn't loaded yet) ─────────────────
 MILITARY_HEX_RANGES = [
-    (0xAE0000, 0xAFFFFF), (0x43C000, 0x43CFFF),
-    (0x3E8000, 0x3E8FFF), (0x3FC800, 0x3FCFFF),
-    (0x3A0000, 0x3A0FFF), (0x33FF00, 0x33FFFF),
-    (0x478100, 0x4781FF), (0x480C00, 0x480CFF),
-    (0x448000, 0x448FFF), (0x340000, 0x340FFF),
-    (0x4B8000, 0x4BFFFF), (0x4A0000, 0x4AFFFF),
-    (0x7CF800, 0x7CFFFF), (0xC0CDF9, 0xC0FFFF),
-    (0x840000, 0x87FFFF), (0x710000, 0x71FFFF),
-    (0x150000, 0x15FFFF),
+    (0xadf7c8, 0xafffff),
+    (0x010070, 0x01008f),
+    (0x0a4000, 0x0a4fff),
+    (0x33ff00, 0x33ffff),
+    (0x350000, 0x37ffff),
+    (0x3aa000, 0x3affff),
+    (0x3b7000, 0x3bffff),
+    (0x3ea000, 0x3ebfff),
+    (0x3f4000, 0x3fbfff),
+    (0x400000, 0x40003f),
+    (0x43c000, 0x43cfff),
+    (0x444000, 0x446fff),
+    (0x44f000, 0x44ffff),
+    (0x457000, 0x457fff),
+    (0x45f400, 0x45f4ff),
+    (0x468000, 0x4683ff),
+    (0x473c00, 0x473c0f),
+    (0x478100, 0x4781ff),
+    (0x480000, 0x480fff),
+    (0x48d800, 0x48d87f),
+    (0x497c00, 0x497cff),
+    (0x498420, 0x49842f),
+    (0x4b7000, 0x4b7fff),
+    (0x4b8200, 0x4b82ff),
+    (0x70c070, 0x70c07f),
+    (0x710258, 0x71028f),
+    (0x710380, 0x71039f),
+    (0x738a00, 0x738aff),
+    (0x7cf800, 0x7cfaff),
+    (0x800200, 0x8002ff),
+    (0xc20000, 0xc3ffff),
+    (0xe40000, 0xe41fff)
 ]
-
 
 def _hex_in_range(hex_code: str) -> bool:
     try:

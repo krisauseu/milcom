@@ -8,30 +8,15 @@ MilCom is a lightweight, web-based dashboard designed to monitor military aircra
 
 MilCom uses a multi-layered filter with **OR logic** – any single match is enough to display an aircraft.
 
-### 1. Aircraft Database Lookup (Primary Filter)
-On startup, MilCom automatically downloads the [`tar1090-db`](https://github.com/wiedehopf/tar1090-db) aircraft database (`aircraft.csv.gz`, ~8 MB) directly from GitHub. This database is maintained by the readsb/Mictronics project and contains ICAO hex codes with a `dbFlags` field:
+### 1. Aircraft Database Lookup (Primary Type Source)
+On startup, MilCom automatically downloads the [`tar1090-db`](https://github.com/wiedehopf/tar1090-db) aircraft database (`aircraft.csv.gz`, ~8 MB) directly from GitHub. This database is maintained by the readsb/Mictronics project and contains ICAO hex codes, registrations, and aircraft types.
 
-| Bit | Meaning |
-|-----|---------|
-| `& 1` | **Military** ← used as primary filter |
-| `& 2` | Interesting |
-| `& 8` | LADD (Law Enforcement / sensitive) |
+The database is refreshed automatically every **12 hours** at runtime. No manual download required. If an aircraft's type in this file matches known military patterns (like `C17`, `A400`, `F16`), it is flagged as military.
 
-The database is refreshed automatically every **12 hours** at runtime. No manual download required.
+### 2. Strict Exact ICAO HEX Range Filter (Primary Filter)
+MilCom uses precise numerical boundaries to identify military aircraft based on their 24-bit ICAO Hex Code. These boundaries are continuously matched against the exact intervals used by the `tar1090-db` military definitions (`ranges.json`). 
 
-### 2. ICAO HEX Range Filter (Safety Net)
-Even if the database misses an aircraft (e.g., newly registered airframe, download not yet complete), MilCom catches it via known **military-only ICAO hex blocks**:
-
-| Range | Country |
-|-------|---------|
-| `AE0000–AFFFFF` | USA |
-| `43C000–43CFFF` | GBR |
-| `3E8000–3E8FFF`, `3FC800–3FCFFF` | DEU |
-| `3A0000–3A0FFF` | FRA |
-| `478100–4781FF` | NATO |
-| `4B8000–4BFFFF` | TUR |
-| `4A0000–4AFFFF` | GRC |
-| … and more | |
+This guarantees strict capturing of all relevant military airframes (e.g., US Mil, NATO, European partners) while completely eliminating false positives from similarly-prefixed civilian airlines (e.g., Ryanair, Turkish Airlines), ensuring a clean tactical picture.
 
 ### 3. Emergency Exception
 Any aircraft broadcasting **Squawk 7700** (General Emergency) is **always** displayed regardless of type.
