@@ -18,9 +18,8 @@
   <!-- App CSS -->
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Inline extras -->
   <style>
-    /* Antenna pulsing marker */
+    /* ── Antenna pulsing marker ───────────────────────────────────────────── */
     .antenna-marker {
       width: 18px;
       height: 18px;
@@ -66,7 +65,39 @@
       }
     }
 
-    /* TYPE column styling */
+    /* ── Crosshair military icon ──────────────────────────────────────────── */
+    .mil-icon {
+      display: inline-block;
+      color: #ff3d00;
+      font-size: 13px;
+      line-height: 1;
+      margin-right: 4px;
+      text-shadow: 0 0 8px #ff3d00aa;
+      animation: crossPulse 2s ease-in-out infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes crossPulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        text-shadow: 0 0 8px #ff3d00aa;
+      }
+
+      50% {
+        opacity: .6;
+        text-shadow: 0 0 16px #ff3d00;
+      }
+    }
+
+    /* ── Flag emoji ───────────────────────────────────────────────────────── */
+    .flag {
+      margin-right: 3px;
+      font-style: normal;
+    }
+
+    /* ── TYPE column styling ──────────────────────────────────────────────── */
     .type-cell {
       color: #6ffc4f;
       font-size: 10px;
@@ -90,10 +121,6 @@
       color: #ff5252;
     }
 
-    .type-cell.bomber {
-      color: #ff5252;
-    }
-
     .type-cell.transport {
       color: #69f0ae;
     }
@@ -102,7 +129,21 @@
       color: #ffd740;
     }
 
-    /* New-contact flash row */
+    .type-cell.military {
+      color: #ff6d00;
+      letter-spacing: 2px;
+      font-size: 9px;
+    }
+
+    /* ── V/R arrow ────────────────────────────────────────────────────────── */
+    .vr-arrow {
+      display: inline-block;
+      font-size: 11px;
+      margin-right: 3px;
+      vertical-align: middle;
+    }
+
+    /* ── New-contact flash row ────────────────────────────────────────────── */
     .new-contact td {
       animation: newFlash 1.5s ease-out;
     }
@@ -116,12 +157,21 @@
         background: transparent;
       }
     }
+
+    /* ── Selected row highlight ───────────────────────────────────────────── */
+    .selected-row td {
+      background: #39ff1415 !important;
+      border-left: 2px solid #39ff14;
+    }
+
+    /* ── Active trail (clicked aircraft) ─────────────────────────────────── */
+    /* applied via JS to the polyline */
   </style>
 </head>
 
 <body>
 
-  <!-- ═══════════════════════ HEADER ══════════════════════════════════════════ -->
+  <!-- ═══════════════════════ HEADER ═══════════════════════════════════════════ -->
   <header>
     <h1><span class="icon">⬡</span>MILCOM TACTICAL DISPLAY</h1>
     <div class="status-bar">
@@ -133,10 +183,10 @@
     </div>
   </header>
 
-  <!-- ═══════════════════════ DASHBOARD ═══════════════════════════════════════ -->
+  <!-- ═══════════════════════ DASHBOARD ════════════════════════════════════════ -->
   <div class="dashboard">
 
-    <!-- ── TABLE PANEL ──────────────────────────────────────────────────────── -->
+    <!-- ── TABLE PANEL ─────────────────────────────────────────────────────── -->
     <div class="panel table-panel">
       <div class="panel-header">
         <span>▸ CONTACT LIST</span>
@@ -147,24 +197,26 @@
           <thead>
             <tr>
               <th>CALLSIGN</th>
+              <th>REG</th>
               <th>TYPE</th>
               <th>HEX</th>
               <th>ALT (ft)</th>
               <th>SPD (kts)</th>
               <th>V/R (ft/m)</th>
+              <th>DST (nm)</th>
               <th>SQUAWK</th>
             </tr>
           </thead>
           <tbody id="tableBody">
             <tr>
-              <td colspan="7" class="no-data">AWAITING DATA FEED …</td>
+              <td colspan="9" class="no-data">AWAITING DATA FEED …</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- ── MAP PANEL ────────────────────────────────────────────────────────── -->
+    <!-- ── MAP PANEL ──────────────────────────────────────────────────────── -->
     <div class="panel map-panel">
       <div class="panel-header">
         <span>▸ TACTICAL MAP</span>
@@ -175,66 +227,56 @@
 
   </div>
 
-  <!-- ═══════════════════════ SCRIPT ══════════════════════════════════════════ -->
+  <!-- ═══════════════════════ SCRIPT ════════════════════════════════════════════ -->
   <script>
     (() => {
       "use strict";
 
-      /* ══════════════════════════════════════════════════════════════════════════
+      /* ══════════════════════════════════════════════════════════════════════
          SONAR PING – Web Audio API
-         ══════════════════════════════════════════════════════════════════════════ */
+         ══════════════════════════════════════════════════════════════════════ */
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       let audioCtx = null;
 
       function playSonarPing() {
-        // Lazy-init audio context (needs user gesture on some browsers,
-        // but auto-refresh calls work after first interaction)
         if (!audioCtx) {
           try { audioCtx = new AudioCtx(); } catch { return; }
         }
         const now = audioCtx.currentTime;
-
-        // Oscillator: 1200 Hz sine, quick decay
         const osc = audioCtx.createOscillator();
         osc.type = "sine";
         osc.frequency.setValueAtTime(1200, now);
         osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
-
-        // Gain envelope
         const gain = audioCtx.createGain();
         gain.gain.setValueAtTime(0.18, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-
         osc.connect(gain).connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.25);
+        osc.start(now); osc.stop(now + 0.25);
       }
 
-      /* ══════════════════════════════════════════════════════════════════════════
+      /* ══════════════════════════════════════════════════════════════════════
          MAP SETUP
-         ══════════════════════════════════════════════════════════════════════════ */
-      const map = L.map("map", {
-        center: [50.35, 6.85],
-        zoom: 8,
-        zoomControl: true,
-      });
+         ══════════════════════════════════════════════════════════════════════ */
+      const map = L.map("map", { center: [50.35, 6.85], zoom: 8, zoomControl: true });
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
       }).addTo(map);
 
       const markerLayer = L.layerGroup().addTo(map);
-      const trailLayer = L.layerGroup().addTo(map);   // polyline trails
+      const trailLayer = L.layerGroup().addTo(map);
       let receiverMarker = null;
 
-      /* ── History trail storage: hex → [[lat,lon], …] (max 15) ─────────────── */
+      /* ── History trail storage: hex → [[lat,lon], …] (max 20) ─────────── */
       const trailHistory = {};
-      const MAX_TRAIL = 15;
+      const trailPolylines = {};   // hex → L.polyline (for highlight)
+      const MAX_TRAIL = 20;
+      let selectedHex = null;      // currently clicked aircraft
 
-      /* ── Aircraft SVG icon factory ──────────────────────────────────────────── */
-      function planeIcon(heading, isEmergency) {
-        const color = isEmergency ? "#ff1744" : "#39ff14";
+      /* ── Aircraft SVG icon factory ──────────────────────────────────────── */
+      function planeIcon(heading, isEmergency, isMil) {
+        const color = isEmergency ? "#ff1744" : isMil ? "#ff6d00" : "#39ff14";
         const rotation = heading || 0;
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22"
       style="transform:rotate(${rotation}deg);filter:drop-shadow(0 0 4px ${color})">
@@ -244,7 +286,7 @@
         return L.divIcon({ html: svg, iconSize: [22, 22], iconAnchor: [11, 11], className: "" });
       }
 
-      /* ── DOM refs ───────────────────────────────────────────────────────────── */
+      /* ── DOM refs ───────────────────────────────────────────────────────── */
       const $body = document.getElementById("tableBody");
       const $badge = document.getElementById("contactBadge");
       const $mapBadge = document.getElementById("mapBadge");
@@ -254,7 +296,7 @@
       const $connDot = document.getElementById("connDot");
       const $linkStat = document.getElementById("linkStatus");
 
-      /* ── UTC clock ──────────────────────────────────────────────────────────── */
+      /* ── UTC clock ──────────────────────────────────────────────────────── */
       function tickClock() {
         const d = new Date();
         $clock.textContent =
@@ -265,7 +307,7 @@
       setInterval(tickClock, 1000);
       tickClock();
 
-      /* ── Helpers ────────────────────────────────────────────────────────────── */
+      /* ── Helpers ────────────────────────────────────────────────────────── */
       function fmt(v, unit) {
         if (v == null || v === "") return "—";
         return Number(v).toLocaleString("en-US") + (unit ? " " + unit : "");
@@ -276,9 +318,27 @@
         return "";
       }
 
-      function vrClass(vr) {
-        if (vr > 0) return "vr-climb";
-        if (vr < 0) return "vr-desc";
+      function vrArrow(vr) {
+        if (vr > 100) return '<span class="vr-arrow vr-climb">▲</span>';
+        if (vr < -100) return '<span class="vr-arrow vr-desc">▼</span>';
+        return '<span class="vr-arrow" style="opacity:.35">▬</span>';
+      }
+
+      /** Flag emoji from HEX prefix */
+      function flagEmoji(hex) {
+        if (!hex) return "";
+        const h = hex.toLowerCase();
+        if (h.startsWith("ae") || h.startsWith("af") || h.startsWith("adf")) return "🇺🇸";
+        if (h.startsWith("3e") || h.startsWith("3f")) return "🇩🇪";
+        if (h.startsWith("43c")) return "🇬🇧";
+        if (h.startsWith("478")) return "🏳️"; // NATO
+        if (h.startsWith("3a0")) return "🇫🇷";
+        if (h.startsWith("33f")) return "🇮🇹";
+        if (h.startsWith("448")) return "🇧🇪";
+        if (h.startsWith("340")) return "🇪🇸";
+        if (h.startsWith("4b")) return "🇹🇷";
+        if (h.startsWith("4a")) return "🇬🇷";
+        if (h.startsWith("480")) return "🇳🇱";
         return "";
       }
 
@@ -286,43 +346,65 @@
       function typeColorClass(t) {
         if (!t) return "";
         const u = t.toUpperCase();
-        if (u.includes("TANKER") || u.includes("KC-")) return "tanker";
-        if (u.includes("AWACS") || u.includes("E-3")) return "awacs";
-        if (u.includes("ISR") || u.includes("RIVET") || u.includes("RECON") || u.includes("RQ-") || u.includes("GLOBAL HAWK") || u.includes("POSEIDON")) return "isr";
-        if (u.includes("FIGHTER") || u.includes("EUROFIGHTER") || u.includes("STRIKE") || u.includes("BOMBER")) return "fighter";
-        if (u.includes("TRANSPORT") || u.includes("C-17") || u.includes("C-5") || u.includes("C-130") || u.includes("A400M") || u.includes("HERCULES") || u.includes("ATLAS") || u.includes("GALAXY")) return "transport";
-        if (u.includes("SPECIAL") || u.includes("VIP") || u.includes("COMMAND") || u.includes("MEDEVAC") || u.includes("MERCURY")) return "special";
+        if (u === "MILITARY") return "military";
+        if (u.includes("KC-") || u.includes("KC1") || u.includes("MRTT") || u.includes("TANKER") || u.includes("VOYAGER")) return "tanker";
+        if (u.includes("AWACS") || u.includes("E-3") || u.includes("E-8")) return "awacs";
+        if (u.includes("ISR") || u.includes("RC-") || u.includes("RQ-") || u.includes("P-8") || u.includes("SENTINEL") || u.includes("SHADOW") || u.includes("RIVET") || u.includes("GLOBAL HAWK")) return "isr";
+        if (u.includes("EUFI") || u.includes("FIGHTER") || u.includes("STRIKE") || u.includes("F-") && u.length <= 5) return "fighter";
+        if (u.includes("C-17") || u.includes("C-5") || u.includes("C-130") || u.includes("A400M") || u.includes("ATLAS") || u.includes("GALAXY") || u.includes("HERCULES") || u.includes("A400") || u === "C17" || u === "A400") return "transport";
+        if (u.includes("SPECIAL") || u.includes("VIP") || u.includes("E-6") || u.includes("CH-")) return "special";
         return "";
       }
 
-      /* ══════════════════════════════════════════════════════════════════════════
+      /* ══════════════════════════════════════════════════════════════════════
          NEW-CONTACT DETECTION
-         ══════════════════════════════════════════════════════════════════════════ */
+         ══════════════════════════════════════════════════════════════════════ */
       let knownHexes = new Set();
       let firstLoad = true;
 
       function detectNewContacts(list) {
         const currentHexes = new Set(list.map(a => a.hex));
         const newOnes = [];
-
         if (!firstLoad) {
           for (const hex of currentHexes) {
-            if (!knownHexes.has(hex)) {
-              newOnes.push(hex);
-            }
+            if (!knownHexes.has(hex)) newOnes.push(hex);
           }
-          if (newOnes.length > 0) {
-            playSonarPing();
-          }
+          if (newOnes.length > 0) playSonarPing();
         }
         firstLoad = false;
         knownHexes = currentHexes;
         return new Set(newOnes);
       }
 
-      /* ══════════════════════════════════════════════════════════════════════════
+      /* ══════════════════════════════════════════════════════════════════════
+         SELECT AIRCRAFT (click-to-pan)
+         ══════════════════════════════════════════════════════════════════════ */
+      function selectAircraft(hex, lat, lon) {
+        selectedHex = hex;
+
+        // Highlight row
+        document.querySelectorAll("tr[data-hex]").forEach(r => {
+          r.classList.toggle("selected-row", r.dataset.hex === hex);
+        });
+
+        // Pan map
+        if (lat != null && lon != null) {
+          map.flyTo([lat, lon], Math.max(map.getZoom(), 9), { duration: 0.8 });
+        }
+
+        // Highlight trail (re-render with thick line)
+        Object.entries(trailPolylines).forEach(([h, poly]) => {
+          if (h === hex) {
+            poly.setStyle({ weight: 4, opacity: 1, color: "#39ff14ee" });
+          } else {
+            poly.setStyle({ weight: 2, opacity: 0.55, color: "#39ff1488" });
+          }
+        });
+      }
+
+      /* ══════════════════════════════════════════════════════════════════════
          MAIN FETCH LOOP
-         ══════════════════════════════════════════════════════════════════════════ */
+         ══════════════════════════════════════════════════════════════════════ */
       async function refresh() {
         try {
           const res = await fetch("/fetch");
@@ -354,63 +436,103 @@
       function setOffline(msg) {
         $connDot.classList.add("offline");
         $linkStat.textContent = "OFFLINE";
-        $body.innerHTML = `<tr><td colspan="7" class="error-msg">⚠ ${msg}</td></tr>`;
+        $body.innerHTML = `<tr><td colspan="9" class="error-msg">⚠ ${msg}</td></tr>`;
       }
 
-      /* ══════════════════════════════════════════════════════════════════════════
-         TABLE RENDERING (with TYPE column)
-         ══════════════════════════════════════════════════════════════════════════ */
+      /* ══════════════════════════════════════════════════════════════════════
+         TABLE RENDERING
+         ══════════════════════════════════════════════════════════════════════ */
       function renderTable(list, newHexes) {
         if (list.length === 0) {
-          $body.innerHTML = '<tr><td colspan="7" class="no-data">NO MILITARY CONTACTS DETECTED</td></tr>';
+          $body.innerHTML = '<tr><td colspan="9" class="no-data">NO MILITARY CONTACTS DETECTED</td></tr>';
           return;
         }
 
-        // Sort: emergencies first, then by altitude descending
+        // Sort: emergencies first, then by distance (r_dst) ascending, then alt descending
         list.sort((a, b) => {
           const aE = a.squawk === "7700" ? 0 : 1;
           const bE = b.squawk === "7700" ? 0 : 1;
           if (aE !== bE) return aE - bE;
+          const aDst = a.r_dst != null ? a.r_dst : 9999;
+          const bDst = b.r_dst != null ? b.r_dst : 9999;
+          if (aDst !== bDst) return aDst - bDst;
           return (b.alt_baro || 0) - (a.alt_baro || 0);
         });
+
+        // Keep ref for click handler
+        const acMap = {};
+        list.forEach(ac => { acMap[ac.hex] = ac; });
 
         let html = "";
         for (const ac of list) {
           const isEmer = ac.squawk === "7700";
           const isNew = newHexes.has(ac.hex);
+          const isMil = !!ac._mil;
+          const isSel = ac.hex === selectedHex;
+
           let cls = "";
           if (isEmer) cls = "emergency";
+          else if (isSel) cls = "selected-row";
           else if (isNew) cls = "new-contact";
 
           const rawCall = (ac.flight || "").trim();
           const callLabel = rawCall || ac.hex?.toUpperCase() || "—";
-          const callHtml = rawCall && ac.hex
+          const callHref = rawCall && ac.hex
             ? `<a href="https://flightaware.com/live/modes/${ac.hex.toLowerCase()}/ident/${rawCall}/redirect" target="_blank" class="hex-link">${callLabel}</a>`
             : callLabel;
           const emerLabel = isEmer ? '<span class="emergency-label">EMERGENCY</span>' : "";
+          const crosshair = isMil ? '<span class="mil-icon" title="MILITARY">⊕</span>' : "";
+          const flag = `<span class="flag">${flagEmoji(ac.hex)}</span>`;
+
           const sq = ac.squawk || "—";
           const type = ac._type || "";
           const typeCls = typeColorClass(type);
+          const reg = (ac.r || "—").trim();
 
-          html += `<tr${cls ? ` class="${cls}"` : ""}>
-        <td>${callHtml}${emerLabel}</td>
-        <td class="type-cell ${typeCls}">${type || "—"}</td>
-        <td>${(ac.hex || "—").toUpperCase()}</td>
-        <td>${ac.alt_baro != null ? fmt(ac.alt_baro) : "—"}</td>
-        <td>${ac.gs != null ? fmt(Math.round(ac.gs)) : "—"}</td>
-        <td class="${vrClass(ac.baro_rate)}">${ac.baro_rate != null ? fmt(ac.baro_rate) : "—"}</td>
-        <td class="${squawkClass(sq)}">${sq}</td>
-      </tr>`;
+          // Altitude with V/R arrow
+          const vr = ac.baro_rate;
+          const altCell = ac.alt_baro != null
+            ? `${vrArrow(vr)}${fmt(ac.alt_baro)}`
+            : "—";
+
+          const dstNm = ac.r_dst != null
+            ? Number(ac.r_dst).toFixed(1)
+            : "—";
+
+          html += `<tr${cls ? ` class="${cls}"` : ""} data-hex="${ac.hex || ""}" data-lat="${ac.lat ?? ""}" data-lon="${ac.lon ?? ""}">
+          <td>${flag}${crosshair}${callHref}${emerLabel}</td>
+          <td class="type-cell">${reg}</td>
+          <td class="type-cell ${typeCls}">${type || "—"}</td>
+          <td>${(ac.hex || "—").toUpperCase()}</td>
+          <td>${altCell}</td>
+          <td>${ac.gs != null ? fmt(Math.round(ac.gs)) : "—"}</td>
+          <td class="${vr > 100 ? "vr-climb" : vr < -100 ? "vr-desc" : ""}">${vr != null ? fmt(vr) : "—"}</td>
+          <td>${dstNm}</td>
+          <td class="${squawkClass(sq)}">${sq}</td>
+        </tr>`;
         }
         $body.innerHTML = html;
+
+        // Attach click handlers
+        document.querySelectorAll("tr[data-hex]").forEach(row => {
+          row.style.cursor = "pointer";
+          row.addEventListener("click", () => {
+            const hex = row.dataset.hex;
+            const lat = row.dataset.lat ? parseFloat(row.dataset.lat) : null;
+            const lon = row.dataset.lon ? parseFloat(row.dataset.lon) : null;
+            selectAircraft(hex, lat, lon);
+          });
+        });
       }
 
-      /* ══════════════════════════════════════════════════════════════════════════
+      /* ══════════════════════════════════════════════════════════════════════
          MAP RENDERING (with history trails)
-         ══════════════════════════════════════════════════════════════════════════ */
+         ══════════════════════════════════════════════════════════════════════ */
       function renderMap(list, receiver) {
         markerLayer.clearLayers();
         trailLayer.clearLayers();
+        // Clear old polyline refs
+        for (const k of Object.keys(trailPolylines)) delete trailPolylines[k];
 
         // Antenna marker (once)
         if (receiver && receiver.lat != null && receiver.lon != null) {
@@ -436,45 +558,53 @@
         for (const ac of withPos) {
           const hex = ac.hex;
           const isEmer = ac.squawk === "7700";
+          const isMil = !!ac._mil;
+          const isSel = hex === selectedHex;
           const call = (ac.flight || "").trim() || hex?.toUpperCase() || "UNKN";
           const type = ac._type || "";
 
-          // ── Update trail history ─────────────────────────────────
+          // ── Update trail history ───────────────────────────────────────
           if (!trailHistory[hex]) trailHistory[hex] = [];
           const trail = trailHistory[hex];
           const lastPos = trail[trail.length - 1];
-          // Only add if position actually changed
           if (!lastPos || lastPos[0] !== ac.lat || lastPos[1] !== ac.lon) {
             trail.push([ac.lat, ac.lon]);
             if (trail.length > MAX_TRAIL) trail.shift();
           }
 
-          // ── Draw trail polyline ──────────────────────────────────
+          // ── Draw trail polyline ────────────────────────────────────────
           if (trail.length > 1) {
-            const trailColor = isEmer ? "#ff1744aa" : "#39ff1488"; // Increased opacity (aa for emergency, 88 for normal)
-            L.polyline(trail, {
-              color: trailColor,
-              weight: 2, // Slightly increased from 1.5
-              dashArray: "5 5", // Adjusted for better visual spacing
+            const color = isEmer ? "#ff1744cc" : isMil ? "#ff6d0088" : "#39ff1488";
+            const weight = isSel ? 4 : 2;
+            const opacity = isSel ? 1 : 0.55;
+            const poly = L.polyline(trail, {
+              color, weight, opacity,
+              dashArray: isSel ? null : "5 5",
               interactive: false,
             }).addTo(trailLayer);
+            trailPolylines[hex] = poly;
           }
 
-          // ── Aircraft marker ──────────────────────────────────────
+          // ── Aircraft marker ────────────────────────────────────────────
           const marker = L.marker([ac.lat, ac.lon], {
-            icon: planeIcon(ac.track, isEmer),
+            icon: planeIcon(ac.track, isEmer, isMil),
           });
 
           marker.bindPopup(
             `<b>${call}</b>` + (type ? `<br><span style="color:#6ffc4f;font-size:10px">${type}</span>` : "") + `<br>` +
             `HEX: ${(hex || "—").toUpperCase()}<br>` +
+            (ac.r ? `REG: ${ac.r}<br>` : "") +
             `ALT: ${ac.alt_baro != null ? fmt(ac.alt_baro, "ft") : "—"}<br>` +
             `SPD: ${ac.gs != null ? fmt(Math.round(ac.gs), "kts") : "—"}<br>` +
+            (ac.r_dst != null ? `DST: ${Number(ac.r_dst).toFixed(1)} nm<br>` : "") +
             `SQK: ${ac.squawk || "—"}` +
-            (isEmer ? '<br><span style="color:#ff1744;font-weight:700">⚠ EMERGENCY</span>' : ""),
-            { closeButton: false, className: "" }
+            (isEmer ? '<br><span style="color:#ff1744;font-weight:700">⚠ EMERGENCY</span>' : "") +
+            (isMil ? '<br><span style="color:#ff6d00">⊕ MILITARY</span>' : ""),
+            { closeButton: false }
           );
 
+          // Click on marker also selects
+          marker.on("click", () => selectAircraft(hex, ac.lat, ac.lon));
           marker.addTo(markerLayer);
         }
 
@@ -485,9 +615,9 @@
         }
       }
 
-      /* ── Start ──────────────────────────────────────────────────────────────── */
+      /* ── Start ──────────────────────────────────────────────────────────── */
       refresh();
-      setInterval(refresh, 2000);
+      setInterval(refresh, 1000);   // 1-second refresh
     })();
   </script>
 

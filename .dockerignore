@@ -3,3 +3,4 @@ __pycache__
 .git
 .gitignore
 Caddyfile.snippet
+aircraft.csv.gz

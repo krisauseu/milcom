@@ -1,49 +1,72 @@
 # MilCom - Military Aircraft Monitor
 
-MilCom is a lightweight, web-based dashboard designed to monitor military aircraft traffic in real-time. It fetches ADS-B data from a local receiver and applies specialized filters to highlight military assets, providing a clear overview of tactical air movements.
+MilCom is a lightweight, web-based dashboard designed to monitor military aircraft traffic in real-time. It fetches ADS-B data from a local receiver and applies specialized filters to highlight military assets.
 
 ![MilCom Dashboard](milcom.png)
 
 ## Filtering & Identification
 
-MilCom uses a strict, multi-layered filtering system to ensure a pure military tactical display:
+MilCom uses a multi-layered filter with **OR logic** – any single match is enough to display an aircraft.
 
-### 1. Strict Callsign Filter
-Only aircraft with specific military callsign prefixes are allowed through. This includes:
-*   **US/NATO Transport & AWACS**: `RCH`, `C5`, `C17`, `C130`, `CNV`, `NATO`, `MAGIC`
-*   **European Air Forces**: `GAF`, `GNY` (Germany), `RRR`, `ASCOT` (UK), `BAF` (Belgium), `NAF` (Netherlands), `FAF`, `AME` (France), `POL` (Poland), etc.
-*   **Special Ops & ISR**: `DUKE`, `VADER`, `JAKE`, `FORTE`
-*   **Tankers**: `LAGR`, `NCHO`, `QID`, `GOLD`, `TEX`, `TARTN`
+### 1. Aircraft Database Lookup (Primary Filter)
+On startup, MilCom automatically downloads the [`tar1090-db`](https://github.com/wiedehopf/tar1090-db) aircraft database (`aircraft.csv.gz`, ~8 MB) directly from GitHub. This database is maintained by the readsb/Mictronics project and contains ICAO hex codes with a `dbFlags` field:
 
-### 2. Precise HEX Ranges
-Beyond callsigns, MilCom tracks thousands of specific ICAO hex addresses belonging to military airframes. National blocks are narrowed down to military-only sub-ranges (e.g., US Military `AE0000-AFFFFF`) to exclude civilian aircraft from the same country.
+| Bit | Meaning |
+|-----|---------|
+| `& 1` | **Military** ← used as primary filter |
+| `& 2` | Interesting |
+| `& 8` | LADD (Law Enforcement / sensitive) |
 
-### 3. Emergency Exceptions
-Any aircraft broadcasting an **Emergency Squawk** (`7700` General Emergency, `7600` Radio Failure, `7500` Hijack) is **ALWAYS** displayed, regardless of its origin or type.
+The database is refreshed automatically every **12 hours** at runtime. No manual download required.
 
-### 4. Country Fallback Identification
-If a specific aircraft type is not in our database, MilCom uses its HEX range to identify the country of origin. Instead of a blank entry, you will see labels like `TUR`, `GRC`, or `DEU`.
+### 2. ICAO HEX Range Filter (Safety Net)
+Even if the database misses an aircraft (e.g., newly registered airframe, download not yet complete), MilCom catches it via known **military-only ICAO hex blocks**:
+
+| Range | Country |
+|-------|---------|
+| `AE0000–AFFFFF` | USA |
+| `43C000–43CFFF` | GBR |
+| `3E8000–3E8FFF`, `3FC800–3FCFFF` | DEU |
+| `3A0000–3A0FFF` | FRA |
+| `478100–4781FF` | NATO |
+| `4B8000–4BFFFF` | TUR |
+| `4A0000–4AFFFF` | GRC |
+| … and more | |
+
+### 3. Emergency Exception
+Any aircraft broadcasting **Squawk 7700** (General Emergency) is **always** displayed regardless of type.
+
+### Type Identification
+Aircraft type is resolved in this order:
+1. **CSV database** type code (e.g. `C17`, `EUFI`, `A400`)
+2. **Live `t` field** from the readsb JSON (when DB-enriched)
+3. Fallback: `MILITARY`
+
+## Admin Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /db-status` | Shows DB load time, military ICAO count, last error |
+| `POST /db-reload` | Triggers immediate DB re-download |
+| `GET /db-debug` | Returns first 10 raw CSV rows (for format verification) |
 
 ## Hardware Requirements
 
-To use this dashboard, you need a local ADS-B receiving setup:
-
-*   **Raspberry Pi** (or similar SBC/Server).
-*   **ADS-B Receiver** (e.g., FlightAware Pro Stick or RTL-SDR).
-*   **Antenna** tuned for 1090 MHz.
-*   **Software**: Piaware or a standard dump1090-fa installation with SkyAware enabled.
+*   **Raspberry Pi** (or similar SBC) with ADS-B receiver (e.g. FlightAware Pro Stick, RTL-SDR)
+*   **Antenna** tuned for 1090 MHz
+*   **Software**: readsb / tar1090 (`/airplanes/data/aircraft.json` endpoint)
 
 ## Features
 
-*   **Real-time Map**: Visualizes aircraft positions with history trails.
-*   **Military Focus**: Specifically tuned to filter out civilian traffic and show only relevant military/government flights.
-*   **Type Recognition**: Identifies specific airframes (e.g., C-17 Globemaster, KC-135 Stratotanker, Eurofighter) using a built-in database.
-*   **Filter Logic**: Heuristic-based detection of tankers, AWACS, and reconnaissance aircraft even when type data is missing.
-*   **Auth Protected**: Simple basic authentication for secure remote access.
+*   **Real-time Map** with history trails (last 20 GPS positions)
+*   **Distance-sorted contact list** – nearest aircraft at top
+*   **REG + TYPE columns** from live data and aircraft DB
+*   **Tactical HUD**: pulsing ⊕ crosshair icon for military contacts, national flag emojis, ▲/▼ altitude trend arrows
+*   **Click-to-pan**: click a row to fly the map to that aircraft and highlight its trail
+*   **Sonar ping** audio alert on new contact detection
+*   **Basic Auth** protected access
 
 ## Installation via Docker Compose
-
-The easiest way to run MilCom is using Docker Compose.
 
 1.  **Clone the repository**:
     ```bash
@@ -51,24 +74,22 @@ The easiest way to run MilCom is using Docker Compose.
     cd milcom
     ```
 
-2.  **Configure the receiver IP**:
-    Edit the `docker-compose.yml` file and set the `PI_IP` environment variable to the IP address of your Raspberry Pi running Piaware.
-
+2.  **Configure** `docker-compose.yml`:
     ```yaml
     environment:
-      - PI_IP=192.168.1.100  # Change to your Pi's IP
+      - PI_IP=192.168.1.100   # IP of your readsb/tar1090 receiver
       - AUTH_USER=admin
       - AUTH_PASS=yourpassword
     ```
 
-3.  **Start the container**:
+3.  **Start**:
     ```bash
     docker-compose up -d
     ```
+    The aircraft database downloads automatically on first start (~5 seconds).
 
-4.  **Access the Dashboard**:
-    Open your browser and navigate to `http://<your-server-ip>:5050`.
+4.  **Access**: `http://<your-server-ip>:5050`
 
 ## License
 
-This project is for educational and hobbyist use. Data accuracy depends on your local receiver coverage and the heuristics used for identification.
+For educational and hobbyist use. Data accuracy depends on local receiver coverage and the aircraft database.
